@@ -8,6 +8,10 @@
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -83,15 +87,21 @@
             border-radius: 12px;
             padding: 16px;
         }
-        .profile-image {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid #ff8c00;
-        }
         .hidden {
             display: none !important;
+        }
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #ff8c00;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -114,15 +124,9 @@
 
     <!-- Main Referral Container -->
     <div id="referral-container" class="min-h-screen p-4 max-w-md mx-auto fade-in" style="display: none;">
-        <!-- Header with User Profile -->
+        <!-- Header -->
         <header class="flex items-center justify-between p-4 sticky top-0 bg-opacity-80 backdrop-blur-md z-10 dark-bg">
-            <div class="flex items-center space-x-3">
-                <img id="user-profile-image" src="" class="profile-image hidden">
-                <div>
-                    <h2 id="user-name" class="font-bold text-lg"></h2>
-                    <p class="text-xs text-gray-400">UID: <span id="user-uid"></span></p>
-                </div>
-            </div>
+            <h1 class="text-xl font-bold text-[#ff8c00]">রেফারেল সিস্টেম</h1>
             <button onclick="closeApp()" class="text-[#ff8c00] p-2 rounded-lg bg-gray-800">
                 <i data-lucide="x" class="w-5 h-5"></i>
             </button>
@@ -145,7 +149,7 @@
                 
                 <p class="text-sm text-gray-300 mb-4">
                     আপনার বন্ধুদের সাথে শেয়ার করুন এবং প্রতিটি সফল রেফারেলে 
-                    <span class="text-[#ff8c00] font-bold" id="referral-bonus-text">100 ef</span> 
+                    <span class="text-[#ff8c00] font-bold">100 ef</span> 
                     বোনাস পান!
                 </p>
                 
@@ -155,66 +159,71 @@
                 </button>
             </div>
 
-            <!-- Referral Claim Section -->
-            <div id="referral-claim-section" class="bonus-section hidden">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-1">
-                        <i data-lucide="gift" class="w-6 h-6 text-blue-400"></i>
+            <!-- Referral Status Section -->
+            <div id="referral-status-section">
+                <!-- Apply Referral Code Section -->
+                <div id="referral-input-section" class="card-bg p-5 rounded-lg">
+                    <div class="flex items-center mb-4">
+                        <i data-lucide="user-plus" class="w-5 h-5 text-[#ff8c00] mr-2"></i>
+                        <h3 class="font-semibold text-lg">রেফারেল কোড প্রয়োগ করুন</h3>
                     </div>
-                    <div class="ml-3 flex-1">
-                        <h3 class="font-bold text-blue-400 text-lg">রেফারেল বোনাস উপলব্ধ! 🎁</h3>
-                        <p class="text-sm text-gray-200 mt-2">
-                            <span id="referrer-name" class="font-medium"></span> 
-                            আপনাকে রেফার করেছে
-                        </p>
-                        <button onclick="claimReferralBonus()" class="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg text-sm transition">
-                            <i data-lucide="sparkles" class="w-4 h-4 inline mr-2"></i>
-                            বোনাস ক্লেইম করুন
-                        </button>
-                    </div>
+                    
+                    <input 
+                        id="enter-referral-code" 
+                        type="text" 
+                        placeholder="রেফারেল ইউআইডি এখানে লিখুন..." 
+                        class="w-full p-3 rounded-lg input-field mb-3 focus:outline-none focus:ring-2 focus:ring-[#ff8c00]"
+                    >
+                    
+                    <button id="apply-referral-btn" class="w-full p-3 rounded-lg btn-outline-accent flex items-center justify-center">
+                        <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
+                        প্রয়োগ করুন
+                    </button>
                 </div>
-            </div>
 
-            <!-- Referral Used Section -->
-            <div id="referral-used-section" class="used-section hidden">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-1">
-                        <i data-lucide="badge-check" class="w-6 h-6 text-green-400"></i>
-                    </div>
-                    <div class="ml-3 flex-1">
-                        <h3 class="font-bold text-green-400 text-lg">রেফারেল বোনাস পেয়েছেন! 🎉</h3>
-                        <p class="text-sm text-gray-200 mt-2">
-                            <span id="referrer-info-name" class="font-medium"></span> এর দ্বারা রেফার্ড হয়েছেন
-                        </p>
-                        <p class="text-xs text-gray-300 mt-2 bg-green-900 bg-opacity-30 p-2 rounded">
-                            আপনি <span id="referral-bonus-amount" class="font-bold">100</span> ef বোনাস পেয়েছেন
-                        </p>
+                <!-- Referrer Info Section (After Applying Code) -->
+                <div id="referrer-info-section" class="bonus-section hidden">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 mt-1">
+                            <i data-lucide="user-check" class="w-6 h-6 text-blue-400"></i>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="font-bold text-blue-400 text-lg">রেফারেল কোড প্রয়োগ হয়েছে</h3>
+                            <p class="text-sm text-gray-200 mt-2">
+                                রেফার করেছেন: <span id="referrer-name" class="font-medium text-blue-300"></span>
+                                <span id="referrer-username" class="text-blue-200 ml-2"></span>
+                            </p>
+                            <div class="flex space-x-2 mt-3">
+                                <button onclick="clearReferralCode()" class="flex-1 p-2 rounded-lg bg-gray-600 text-white text-sm">
+                                    ক্লিয়ার করুন
+                                </button>
+                                <button onclick="claimReferralBonus()" class="flex-1 p-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition">
+                                    <i data-lucide="sparkles" class="w-4 h-4 inline mr-1"></i>
+                                    ক্লেইম করুন
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Apply Referral Code Section -->
-            <div id="referral-input-section" class="card-bg p-5 rounded-lg">
-                <div class="flex items-center mb-4">
-                    <i data-lucide="user-plus" class="w-5 h-5 text-[#ff8c00] mr-2"></i>
-                    <h3 class="font-semibold text-lg">কারো রেফারেল ইউআইডি আছে?</h3>
+                <!-- Already Claimed Section -->
+                <div id="referral-used-section" class="used-section hidden">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 mt-1">
+                            <i data-lucide="badge-check" class="w-6 h-6 text-green-400"></i>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="font-bold text-green-400 text-lg">রেফারেল বোনাস পেয়েছেন! 🎉</h3>
+                            <p class="text-sm text-gray-200 mt-2">
+                                রেফার করেছেন: <span id="referrer-info-name" class="font-medium text-green-300"></span>
+                                <span id="referrer-info-username" class="text-green-200 ml-2"></span>
+                            </p>
+                            <p class="text-xs text-gray-300 mt-2 bg-green-900 bg-opacity-30 p-2 rounded">
+                                আপনি <span class="font-bold">100 ef</span> রেফারেল বোনাস পেয়েছেন
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                
-                <input 
-                    id="enter-referral-code" 
-                    type="text" 
-                    placeholder="রেফারেল ইউআইডি এখানে লিখুন..." 
-                    class="w-full p-3 rounded-lg input-field mb-3 focus:outline-none focus:ring-2 focus:ring-[#ff8c00]"
-                >
-                
-                <button id="apply-referral-btn" class="w-full p-3 rounded-lg btn-outline-accent flex items-center justify-center">
-                    <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
-                    ইউআইডি প্রয়োগ করুন
-                </button>
-                
-                <p class="text-xs text-gray-400 mt-3 text-center">
-                    রেফারেল ইউআইডি প্রয়োগ করলে আপনি <span class="text-[#ff8c00]">বোনাস ef</span> পাবেন
-                </p>
             </div>
 
             <!-- Referral Statistics -->
@@ -282,6 +291,21 @@
     </div>
 
     <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyAVsY970aU6sa6Cu2Yw0WnbS3OfCW7QfaY",
+  authDomain: "ef-earn-bot.firebaseapp.com",
+  databaseURL: "https://ef-earn-bot-default-rtdb.firebaseio.com",
+  projectId: "ef-earn-bot",
+  storageBucket: "ef-earn-bot.firebasestorage.app",
+  messagingSenderId: "700440287970",
+  appId: "1:700440287970:web:e602a158b0cc670d3f1cbb"
+};
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         // Global variables
         let currentUser = null;
         let userData = null;
@@ -295,12 +319,9 @@
         const referralCodeEl = document.getElementById('referral-code');
         const totalReferralsEl = document.getElementById('total-referrals');
         const referralEarningsEl = document.getElementById('referral-earnings');
-        const userProfileImage = document.getElementById('user-profile-image');
-        const userNameEl = document.getElementById('user-name');
-        const userUidEl = document.getElementById('user-uid');
         const referralInputSection = document.getElementById('referral-input-section');
+        const referrerInfoSection = document.getElementById('referrer-info-section');
         const referralUsedSection = document.getElementById('referral-used-section');
-        const referralClaimSection = document.getElementById('referral-claim-section');
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
@@ -336,7 +357,6 @@
                 await loadAppConfig();
                 
                 // Update UI
-                updateUserProfile();
                 updateReferralUI();
                 updateReferralStats();
                 
@@ -353,29 +373,110 @@
             }
         }
 
-        // Setup Telegram user data
+        // Setup Telegram user data with Firebase
         async function setupTelegramUser(tgUser) {
+            const userUid = tgUser.id.toString();
             currentUser = {
-                uid: tgUser.id.toString(),
+                uid: userUid,
                 telegramData: tgUser
             };
 
-            // In real app, you would fetch user data from your backend
-            // For demo, we're creating mock data
-            userData = {
-                uid: tgUser.id.toString(),
-                telegramData: tgUser,
-                balance: 1500,
-                referralCode: tgUser.id.toString(), // Using Telegram UID as referral code
+            try {
+                // Check if user exists in Firestore
+                const userDoc = await db.collection("users").doc(userUid).get();
+                
+                if (userDoc.exists) {
+                    // User exists, update profile if needed
+                    userData = userDoc.data();
+                    await updateUserProfileIfNeeded(tgUser, userUid);
+                } else {
+                    // Create new user
+                    await createNewUser(tgUser, userUid);
+                }
+
+                // Load referral data
+                await loadReferralData(userUid);
+                
+            } catch (error) {
+                console.error('Error setting up user:', error);
+                throw error;
+            }
+        }
+
+        // Update user profile if Telegram data changed
+        async function updateUserProfileIfNeeded(tgUser, userUid) {
+            const needsUpdate = 
+                userData.telegramData?.first_name !== tgUser.first_name ||
+                userData.telegramData?.last_name !== tgUser.last_name ||
+                userData.telegramData?.username !== tgUser.username ||
+                userData.telegramData?.photo_url !== tgUser.photo_url;
+
+            if (needsUpdate) {
+                await db.collection("users").doc(userUid).update({
+                    telegramData: {
+                        id: tgUser.id,
+                        first_name: tgUser.first_name,
+                        last_name: tgUser.last_name || '',
+                        username: tgUser.username || '',
+                        photo_url: tgUser.photo_url || '',
+                        language_code: tgUser.language_code || 'en'
+                    },
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Reload user data
+                const updatedDoc = await db.collection("users").doc(userUid).get();
+                userData = updatedDoc.data();
+            }
+        }
+
+        // Create new user in Firestore
+        async function createNewUser(tgUser, userUid) {
+            const newUserData = {
+                uid: userUid,
+                telegramData: {
+                    id: tgUser.id,
+                    first_name: tgUser.first_name,
+                    last_name: tgUser.last_name || '',
+                    username: tgUser.username || '',
+                    photo_url: tgUser.photo_url || '',
+                    language_code: tgUser.language_code || 'en'
+                },
+                balance: 0,
+                referralCode: userUid, // Using UID as referral code
                 referredBy: null,
                 referralBonusClaimed: false,
-                totalReferrals: Math.floor(Math.random() * 10),
-                totalEarned: 500 + Math.floor(Math.random() * 1000),
-                createdAt: new Date()
+                totalReferrals: 0,
+                referralEarnings: 0,
+                totalEarned: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await db.collection("users").doc(userUid).set(newUserData);
+            userData = newUserData;
+
+            // Create referral document
+            await db.collection("referrals").doc(userUid).set({
+                userId: userUid,
+                referrerId: null,
+                referredUsers: [],
+                totalReferrals: 0,
+                totalEarnings: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        // Load referral data from Firestore
+        async function loadReferralData(userUid) {
+            try {
+                const referralDoc = await db.collection("referrals").doc(userUid).get();
+                if (referralDoc.exists) {
+                    userData.referralData = referralDoc.data();
+                }
+            } catch (error) {
+                console.error('Error loading referral data:', error);
+            }
         }
 
         // Show non-Telegram warning
@@ -390,33 +491,21 @@
 
         // Load app configuration
         async function loadAppConfig() {
-            // Mock app config - replace with actual config from database
-            appConfig = {
-                referralBonus: 100,
-                referrerBonus: 100,
-                minWithdrawal: 5000,
-                botUsername: "efEarnBot" // Replace with your actual bot username
-            };
-        }
-
-        // Update user profile from Telegram data
-        function updateUserProfile() {
-            if (!userData || !userData.telegramData) return;
-
-            const tgUser = userData.telegramData;
-            
-            // Update profile image
-            if (tgUser.photo_url) {
-                userProfileImage.src = tgUser.photo_url;
-                userProfileImage.classList.remove('hidden');
+            try {
+                const configDoc = await db.collection("config").doc("referral").get();
+                appConfig = configDoc.exists ? configDoc.data() : {
+                    referralBonus: 100,
+                    referrerBonus: 100,
+                    botUsername: "efEarnBot"
+                };
+            } catch (error) {
+                console.error('Error loading app config:', error);
+                appConfig = {
+                    referralBonus: 100,
+                    referrerBonus: 100,
+                    botUsername: "efEarnBot"
+                };
             }
-            
-            // Update name
-            const fullName = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
-            userNameEl.textContent = fullName;
-            
-            // Update UID (only showing UID, not username)
-            userUidEl.textContent = userData.uid;
         }
 
         // Setup event listeners
@@ -445,28 +534,76 @@
             
             // Show appropriate sections based on referral status
             if (userData.referredBy && !userData.referralBonusClaimed) {
-                // User was referred but hasn't claimed bonus
-                referralInputSection.classList.add('hidden');
-                referralUsedSection.classList.add('hidden');
-                referralClaimSection.classList.remove('hidden');
-                
-                // In real app, you would fetch referrer info from database
-                document.getElementById('referrer-name').textContent = 'একজন বন্ধু';
+                // User has applied referral code but not claimed bonus
+                showReferrerInfoSection(userData.referredBy);
                 
             } else if (userData.referredBy && userData.referralBonusClaimed) {
-                // User was referred and already claimed bonus
-                referralInputSection.classList.add('hidden');
-                referralClaimSection.classList.add('hidden');
-                referralUsedSection.classList.remove('hidden');
-                
-                document.getElementById('referrer-info-name').textContent = 'একজন বন্ধু';
-                document.getElementById('referral-bonus-amount').textContent = appConfig.referralBonus || 100;
+                // User has already claimed bonus
+                showReferralUsedSection(userData.referredBy);
                 
             } else {
-                // User wasn't referred
-                referralUsedSection.classList.add('hidden');
-                referralClaimSection.classList.add('hidden');
+                // User hasn't applied any referral code
                 referralInputSection.classList.remove('hidden');
+                referrerInfoSection.classList.add('hidden');
+                referralUsedSection.classList.add('hidden');
+            }
+        }
+
+        // Show referrer info section
+        async function showReferrerInfoSection(referrerUid) {
+            try {
+                // Fetch referrer data
+                const referrerDoc = await db.collection("users").doc(referrerUid).get();
+                if (referrerDoc.exists) {
+                    const referrerData = referrerDoc.data();
+                    
+                    document.getElementById('referrer-name').textContent = 
+                        referrerData.telegramData?.first_name + 
+                        (referrerData.telegramData?.last_name ? ' ' + referrerData.telegramData.last_name : '');
+                    
+                    document.getElementById('referrer-username').textContent = 
+                        referrerData.telegramData?.username ? '@' + referrerData.telegramData.username : '';
+                } else {
+                    document.getElementById('referrer-name').textContent = 'একজন ইউজার';
+                    document.getElementById('referrer-username').textContent = '';
+                }
+                
+                referralInputSection.classList.add('hidden');
+                referrerInfoSection.classList.remove('hidden');
+                referralUsedSection.classList.add('hidden');
+                
+            } catch (error) {
+                console.error('Error fetching referrer data:', error);
+                showAlert('রেফারার তথ্য লোড করতে সমস্যা হয়েছে।');
+            }
+        }
+
+        // Show referral used section
+        async function showReferralUsedSection(referrerUid) {
+            try {
+                // Fetch referrer data
+                const referrerDoc = await db.collection("users").doc(referrerUid).get();
+                if (referrerDoc.exists) {
+                    const referrerData = referrerDoc.data();
+                    
+                    document.getElementById('referrer-info-name').textContent = 
+                        referrerData.telegramData?.first_name + 
+                        (referrerData.telegramData?.last_name ? ' ' + referrerData.telegramData.last_name : '');
+                    
+                    document.getElementById('referrer-info-username').textContent = 
+                        referrerData.telegramData?.username ? '@' + referrerData.telegramData.username : '';
+                } else {
+                    document.getElementById('referrer-info-name').textContent = 'একজন ইউজার';
+                    document.getElementById('referrer-info-username').textContent = '';
+                }
+                
+                referralInputSection.classList.add('hidden');
+                referrerInfoSection.classList.add('hidden');
+                referralUsedSection.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error fetching referrer data:', error);
+                showAlert('রেফারার তথ্য লোড করতে সমস্যা হয়েছে।');
             }
         }
 
@@ -475,11 +612,14 @@
             if (!userData) return;
 
             try {
-                // In real app, you would fetch this from database
-                totalReferralsEl.textContent = userData.totalReferrals || 0;
-                
-                const referralEarnings = (userData.totalReferrals || 0) * (appConfig.referrerBonus || 100);
-                referralEarningsEl.textContent = referralEarnings;
+                // Get referral data from Firestore
+                const referralDoc = await db.collection("referrals").doc(userData.uid).get();
+                if (referralDoc.exists) {
+                    const referralData = referralDoc.data();
+                    
+                    totalReferralsEl.textContent = referralData.totalReferrals || 0;
+                    referralEarningsEl.textContent = referralData.totalEarnings || 0;
+                }
                 
             } catch (error) {
                 console.error('Error updating referral stats:', error);
@@ -506,14 +646,14 @@
         // Share referral link with Telegram
         function shareReferralCode() {
             const botUsername = appConfig.botUsername || "efEarnBot";
-            const referralLink = `https://t.me/${botUsername}?start=${userData.uid}`;
             
             const shareText = `🎉 **EF রিওয়ার্ড বটে যোগ দিন!**\n\n` +
                             `💰 **ef উপার্জন করুন** সহজ টাস্ক সম্পূর্ণ করে\n` +
                             `👥 **বন্ধুদের আমন্ত্রণ করুন** এবং অতিরিক্ত উপার্জন করুন\n` +
                             `🎁 **বোনাস পান** রেজিস্ট্রেশনের সাথে সাথে\n\n` +
-                            `👉 এখনই জয়েন করুন: ${referralLink}\n\n` +
+                            `👉 এখনই জয়েন করুন: ${userData.uid}\n\n` +
                             `#EFEarn #Rewards #TelegramBot`;
+             const referralLink = `https://t.me/${botUsername}?start=${userData.uid}`;
             
             // Create share URL for Telegram
             const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
@@ -550,23 +690,16 @@
             // Show loading
             const applyBtn = document.getElementById('apply-referral-btn');
             const originalText = applyBtn.innerHTML;
-            applyBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 mr-2 animate-spin"></i>প্রক্রিয়াকরণ...';
+            applyBtn.innerHTML = '<div class="loading-spinner mr-2"></div>প্রয়োগ হচ্ছে...';
             applyBtn.disabled = true;
             
             try {
-                // Simulate API call to apply referral code
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
-                // In real app, you would verify the UID with your backend
+                // Verify referral UID
                 const isValidUID = await verifyReferralUID(code);
                 
                 if (isValidUID) {
                     // Apply the referral UID
-                    userData.referredBy = code;
-                    userData.referralBonusClaimed = false;
-                    
-                    updateReferralUI();
-                    showAlert('রেফারেল ইউআইডি সফলভাবে প্রয়োগ হয়েছে! এখন আপনি বোনাস ক্লেইম করতে পারেন।');
+                    await applyReferralCode(code);
                     codeInput.value = '';
                     
                     // Haptic feedback
@@ -593,14 +726,64 @@
             }
         }
 
-        // Verify referral UID (mock function - replace with actual verification)
+        // Verify referral UID
         async function verifyReferralUID(uid) {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Mock validation - in real app, check against database
-            // For demo, we're accepting any numeric UID that's not the current user's
-            return /^\d+$/.test(uid) && uid !== userData.uid;
+            try {
+                // Check if UID exists in users collection
+                const userDoc = await db.collection("users").doc(uid).get();
+                return userDoc.exists;
+            } catch (error) {
+                console.error('Error verifying UID:', error);
+                return false;
+            }
+        }
+
+        // Apply referral code to user profile
+        async function applyReferralCode(referrerUid) {
+            try {
+                // Update user data
+                await db.collection("users").doc(userData.uid).update({
+                    referredBy: referrerUid,
+                    referralBonusClaimed: false
+                });
+                
+                // Update local user data
+                userData.referredBy = referrerUid;
+                userData.referralBonusClaimed = false;
+                
+                // Update UI
+                updateReferralUI();
+                
+                showAlert('রেফারেল ইউআইডি সফলভাবে প্রয়োগ হয়েছে! এখন আপনি বোনাস ক্লেইম করতে পারেন।');
+                
+            } catch (error) {
+                console.error('Error applying referral code:', error);
+                throw error;
+            }
+        }
+
+        // Clear referral code
+        async function clearReferralCode() {
+            try {
+                // Remove referral code
+                await db.collection("users").doc(userData.uid).update({
+                    referredBy: null,
+                    referralBonusClaimed: false
+                });
+                
+                // Update local user data
+                userData.referredBy = null;
+                userData.referralBonusClaimed = false;
+                
+                // Update UI
+                updateReferralUI();
+                
+                showAlert('রেফারেল কোড ক্লিয়ার করা হয়েছে।');
+                
+            } catch (error) {
+                console.error('Error clearing referral code:', error);
+                showAlert('রেফারেল কোড ক্লিয়ার করতে সমস্যা হয়েছে।');
+            }
         }
 
         // Claim referral bonus
@@ -613,18 +796,38 @@
                 // Show loading
                 showAlert('বোনাস ক্লেইম করা হচ্ছে...');
                 
-                // Simulate API call to claim bonus
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const bonusAmount = appConfig.referralBonus || 100;
                 
-                // Update user data
+                // Update user balance and mark as claimed
+                await db.collection("users").doc(userData.uid).update({
+                    balance: firebase.firestore.FieldValue.increment(bonusAmount),
+                    totalEarned: firebase.firestore.FieldValue.increment(bonusAmount),
+                    referralBonusClaimed: true
+                });
+                
+                // Update referrer's referral data
+                await db.collection("referrals").doc(userData.referredBy).update({
+                    totalReferrals: firebase.firestore.FieldValue.increment(1),
+                    totalEarnings: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100),
+                    referredUsers: firebase.firestore.FieldValue.arrayUnion(userData.uid)
+                });
+                
+                // Update referrer's balance
+                await db.collection("users").doc(userData.referredBy).update({
+                    balance: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100),
+                    totalEarned: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100)
+                });
+                
+                // Update local user data
+                userData.balance += bonusAmount;
+                userData.totalEarned += bonusAmount;
                 userData.referralBonusClaimed = true;
-                userData.balance += (appConfig.referralBonus || 100);
-                userData.totalEarned += (appConfig.referralBonus || 100);
                 
+                // Update UI
                 updateReferralUI();
                 updateReferralStats();
                 
-                showAlert(`🎉 অভিনন্দন! আপনি ${appConfig.referralBonus || 100} ef রেফারেল বোনাস পেয়েছেন!`);
+                showAlert(`🎉 অভিনন্দন! আপনি ${bonusAmount} ef রেফারেল বোনাস পেয়েছেন!`);
                 
                 // Haptic feedback
                 if (tg && tg.HapticFeedback) {
