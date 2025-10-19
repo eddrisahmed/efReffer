@@ -280,15 +280,15 @@
 
     <script>
         // Firebase Configuration
-       const firebaseConfig = {
-  apiKey: "AIzaSyAVsY970aU6sa6Cu2Yw0WnbS3OfCW7QfaY",
-  authDomain: "ef-earn-bot.firebaseapp.com",
-  databaseURL: "https://ef-earn-bot-default-rtdb.firebaseio.com",
-  projectId: "ef-earn-bot",
-  storageBucket: "ef-earn-bot.firebasestorage.app",
-  messagingSenderId: "700440287970",
-  appId: "1:700440287970:web:e602a158b0cc670d3f1cbb"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyDBkvArKeIY11CDntlf9uyWPwZIPED1WZQ",
+            authDomain: "ef-earning-bot.firebaseapp.com",
+            projectId: "ef-earning-bot",
+            storageBucket: "ef-earning-bot.appspot.com",
+            messagingSenderId: "742449423671",
+            appId: "1:742449423671:web:7dfbef9db2e7b4ff6726b2"
+        };
+
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
@@ -553,7 +553,7 @@
                     appConfig = {
                         referralBonus: 100,
                         referrerBonus: 100,
-                        botUsername: "WemoRobot"
+                        botUsername: "efEarnBot"
                     };
                     await db.collection("config").doc("referral").set(appConfig);
                     console.log('Default app config created');
@@ -563,7 +563,7 @@
                 appConfig = {
                     referralBonus: 100,
                     referrerBonus: 100,
-                    botUsername: "WemoRobot"
+                    botUsername: "efEarnBot"
                 };
             }
         }
@@ -738,17 +738,16 @@
 
         // Share referral link with Telegram
         function shareReferralCode() {
-            const botUsername = appConfig.botUsername || "WemoRobot";
-       //   const referralLink = `https://t.me/${botUsername}?start=${userData.uid}`;
-            const claimVideo = `t.me/efEarn/5}`;
+            const botUsername = appConfig.botUsername || "efEarnBot";
+            const referralLink = `https://t.me/${botUsername}?start=${userData.uid}`;
+            
             const shareText = `🎉 **EF রিওয়ার্ড বটে যোগ দিন!**\n\n` +
                             `💰 **ef উপার্জন করুন** সহজ টাস্ক সম্পূর্ণ করে\n` +
-                            `👥 **বন্ধুদের আমন্ত্রণ করুন** এবং অতিরিক্ত উপার্জন করুন\n\n` +
-                            `🎁 **বোনাস কোড**: ${userData.uid}\n` +
-                            `🎥 **বোনাস ক্লেইম ভিডিও**: ${claimVideo}\n\n` +
-                            `👉 এখনই জয়েন করুন: https://t.me/${botUsername}?start=${userData.uid}\n\n` +
+                            `👥 **বন্ধুদের আমন্ত্রণ করুন** এবং অতিরিক্ত উপার্জন করুন\n` +
+                            `🎁 **বোনাস পান** রেজিস্ট্রেশনের সাথে সাথে\n\n` +
+                            `👉 এখনই জয়েন করুন: ${referralLink}\n\n` +
                             `#EFEarn #Rewards #TelegramBot`;
-
+            
             if (tg && tg.openTelegramLink) {
                 // Use Telegram WebApp method
                 const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`;
