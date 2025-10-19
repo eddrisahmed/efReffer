@@ -109,7 +109,7 @@
     <!-- Loader -->
     <div id="loader" class="fixed inset-0 dark-bg bg-opacity-75 flex items-center justify-center z-50">
         <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#ff8c00]"></div>
-        <p class="ml-4 text-[#ff8c00]">লোড হচ্ছে...</p>
+        <p class="ml-4 text-[#ff8c00]" id="loader-text">লোড হচ্ছে...</p>
     </div>
 
     <!-- Main Referral Container -->
@@ -302,6 +302,7 @@
 
         // DOM Elements
         const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loader-text');
         const referralContainer = document.getElementById('referral-container');
         const referralCodeEl = document.getElementById('referral-code');
         const totalReferralsEl = document.getElementById('total-referrals');
@@ -316,6 +317,7 @@
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Loaded - Starting initialization...');
             initializeApp();
             setupEventListeners();
         });
@@ -323,24 +325,38 @@
         // Initialize app with Telegram WebApp
         async function initializeApp() {
             loader.style.display = 'flex';
+            loaderText.textContent = 'লোড হচ্ছে...';
             
             try {
-                // Initialize Telegram WebApp if available
+                console.log('Starting app initialization...');
+                
+                // Check if we're in Telegram WebApp
                 if (tg) {
+                    console.log('Telegram WebApp detected');
                     tg.expand();
                     tg.enableClosingConfirmation();
+                    loaderText.textContent = 'Telegram ডাটা লোড হচ্ছে...';
+                } else {
+                    console.log('Not in Telegram WebApp environment');
                 }
                 
-                // Get Telegram user data
+                // Get Telegram user data with better error handling
                 const tgUser = await getTelegramUser();
+                console.log('Telegram User:', tgUser);
+                
                 if (!tgUser) {
-                    throw new Error('Telegram user data not available');
+                    // If no Telegram user, use demo mode
+                    console.log('No Telegram user found, starting demo mode...');
+                    await startDemoMode();
+                    return;
                 }
                 
-                console.log('Telegram User Data:', tgUser);
+                loaderText.textContent = 'ইউজার ডাটা সেটআপ হচ্ছে...';
                 
                 // Set up user data from Telegram
                 await setupTelegramUser(tgUser);
+                
+                loaderText.textContent = 'কনফিগারেশন লোড হচ্ছে...';
                 
                 // Load app config
                 await loadAppConfig();
@@ -354,6 +370,8 @@
                 referralContainer.style.display = 'block';
                 loader.style.display = 'none';
                 
+                console.log('App initialized successfully');
+                
                 // Haptic feedback
                 if (tg && tg.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('light');
@@ -361,33 +379,108 @@
                 
             } catch (error) {
                 console.error('Initialization error:', error);
-                showAlert('সিস্টেম লোড করতে সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।');
-                loader.style.display = 'none';
+                loaderText.textContent = 'ত্রুটি হচ্ছে...';
+                
+                // Try demo mode as fallback
+                try {
+                    await startDemoMode();
+                } catch (demoError) {
+                    console.error('Demo mode also failed:', demoError);
+                    showAlert('সিস্টেম লোড করতে সমস্যা হয়েছে। পরে আবার চেষ্টা করুন।');
+                    loader.style.display = 'none';
+                }
             }
         }
 
-        // Get Telegram user data
+        // Start demo mode for testing
+        async function startDemoMode() {
+            console.log('Starting demo mode...');
+            loaderText.textContent = 'ডেমো মোড শুরু হচ্ছে...';
+            
+            // Create demo user data
+            const demoUserId = Math.floor(Math.random() * 1000000000).toString();
+            currentUser = {
+                uid: demoUserId,
+                telegramData: {
+                    id: parseInt(demoUserId),
+                    first_name: 'ডেমো ইউজার',
+                    username: 'demouser'
+                }
+            };
+
+            userData = {
+                uid: demoUserId,
+                telegramData: {
+                    first_name: 'ডেমো ইউজার',
+                    username: 'demouser'
+                },
+                balance: 1500,
+                referralCode: demoUserId,
+                referredBy: null,
+                referralBonusClaimed: false,
+                totalReferrals: 3,
+                referralEarnings: 300,
+                totalEarned: 1800,
+                createdAt: new Date()
+            };
+
+            appConfig = {
+                referralBonus: 100,
+                referrerBonus: 100,
+                botUsername: "efEarnBot"
+            };
+
+            // Update UI
+            updateReferralUI();
+            updateReferralStats();
+            updateBonusAmounts();
+            
+            // Show main content
+            referralContainer.style.display = 'block';
+            loader.style.display = 'none';
+            
+            showAlert('ডেমো মোড: টেস্টিং এর জন্য তৈরি ডাটা ব্যবহার করা হচ্ছে।');
+            console.log('Demo mode started successfully');
+        }
+
+        // Get Telegram user data with improved detection
         async function getTelegramUser() {
-            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                return tg.initDataUnsafe.user;
+            console.log('Checking for Telegram user data...');
+            
+            // Method 1: Check Telegram WebApp
+            if (tg && tg.initDataUnsafe) {
+                console.log('Telegram initDataUnsafe:', tg.initDataUnsafe);
+                
+                if (tg.initDataUnsafe.user) {
+                    console.log('Found Telegram user:', tg.initDataUnsafe.user);
+                    return tg.initDataUnsafe.user;
+                }
+                
+                if (tg.initDataUnsafe.start_param) {
+                    console.log('Found start parameter:', tg.initDataUnsafe.start_param);
+                }
             }
             
-            // Check for start parameter (for referral links)
-            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
-                console.log('Start parameter found:', tg.initDataUnsafe.start_param);
-            }
-            
-            // Try to get from URL parameters (for testing)
+            // Method 2: Check URL parameters for testing
             const urlParams = new URLSearchParams(window.location.search);
             const testUserId = urlParams.get('test_user_id');
             if (testUserId) {
+                console.log('Using test user from URL:', testUserId);
                 return {
                     id: parseInt(testUserId),
                     first_name: 'টেস্ট ইউজার',
-                    username: 'testuser'
+                    username: 'testuser_' + testUserId
                 };
             }
             
+            // Method 3: Check for Telegram WebApp init data in URL
+            const initData = urlParams.get('tgWebAppData');
+            if (initData) {
+                console.log('Found Telegram WebApp data in URL');
+                // In real implementation, you would parse this
+            }
+            
+            console.log('No Telegram user data found');
             return null;
         }
 
@@ -408,11 +501,11 @@
                 if (userDoc.exists) {
                     // User exists, update profile if needed
                     userData = userDoc.data();
-                    console.log('Existing user data:', userData);
+                    console.log('Existing user data loaded:', userData);
                     await updateUserProfileIfNeeded(tgUser, userUid);
                 } else {
                     // Create new user
-                    console.log('Creating new user...');
+                    console.log('Creating new user in Firebase...');
                     await createNewUser(tgUser, userUid);
                 }
 
@@ -421,7 +514,7 @@
                 
             } catch (error) {
                 console.error('Error setting up user:', error);
-                throw error;
+                throw new Error('Firebase error: ' + error.message);
             }
         }
 
@@ -435,7 +528,7 @@
                     userData.telegramData?.photo_url !== (tgUser.photo_url || '');
 
                 if (needsUpdate) {
-                    console.log('Updating user profile...');
+                    console.log('Updating user profile in Firebase...');
                     await db.collection("users").doc(userUid).update({
                         telegramData: {
                             id: tgUser.id,
@@ -451,7 +544,7 @@
                     // Reload user data
                     const updatedDoc = await db.collection("users").doc(userUid).get();
                     userData = updatedDoc.data();
-                    console.log('Updated user data:', userData);
+                    console.log('User profile updated:', userData);
                 }
             } catch (error) {
                 console.error('Error updating user profile:', error);
@@ -478,20 +571,20 @@
                         photo_url: tgUser.photo_url || '',
                         language_code: tgUser.language_code || 'en'
                     },
-                    balance: 0,
+                    balance: 50, // Starting bonus
                     referralCode: userUid,
                     referredBy: referredBy,
                     referralBonusClaimed: referredBy ? false : null,
                     totalReferrals: 0,
                     referralEarnings: 0,
-                    totalEarned: 0,
+                    totalEarned: 50,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
                 await db.collection("users").doc(userUid).set(newUserData);
                 userData = newUserData;
-                console.log('New user created:', userData);
+                console.log('New user created in Firebase:', userData);
 
                 // Create referral document
                 await db.collection("referrals").doc(userUid).set({
@@ -536,6 +629,8 @@
                 if (referralDoc.exists) {
                     userData.referralData = referralDoc.data();
                     console.log('Referral data loaded:', userData.referralData);
+                } else {
+                    console.log('No referral data found for user');
                 }
             } catch (error) {
                 console.error('Error loading referral data:', error);
@@ -548,7 +643,7 @@
                 const configDoc = await db.collection("config").doc("referral").get();
                 if (configDoc.exists) {
                     appConfig = configDoc.data();
-                    console.log('App config loaded:', appConfig);
+                    console.log('App config loaded from Firebase:', appConfig);
                 } else {
                     // Create default config if not exists
                     appConfig = {
@@ -557,7 +652,7 @@
                         botUsername: "efEarnBot"
                     };
                     await db.collection("config").doc("referral").set(appConfig);
-                    console.log('Default app config created');
+                    console.log('Default app config created in Firebase');
                 }
             } catch (error) {
                 console.error('Error loading app config:', error);
@@ -599,7 +694,10 @@
 
         // Update referral UI based on user status
         function updateReferralUI() {
-            if (!userData) return;
+            if (!userData) {
+                console.log('No user data available for UI update');
+                return;
+            }
 
             console.log('Updating UI with user data:', userData);
 
@@ -609,14 +707,17 @@
             // Show appropriate sections based on referral status
             if (userData.referredBy && userData.referralBonusClaimed) {
                 // User has already claimed bonus - PERMANENT STATE
+                console.log('Showing already claimed section');
                 showReferralUsedSection(userData.referredBy);
                 
             } else if (userData.referredBy && userData.referralBonusClaimed === false) {
                 // User has applied referral code but not claimed bonus
+                console.log('Showing referrer info section');
                 showReferrerInfoSection(userData.referredBy);
                 
             } else {
                 // User hasn't applied any referral code
+                console.log('Showing referral input section');
                 referralInputSection.classList.remove('hidden');
                 referrerInfoSection.classList.add('hidden');
                 referralUsedSection.classList.add('hidden');
@@ -626,6 +727,8 @@
         // Show referrer info section
         async function showReferrerInfoSection(referrerUid) {
             try {
+                console.log('Loading referrer data for:', referrerUid);
+                
                 // Try to fetch referrer data from Firebase
                 const referrerDoc = await db.collection("users").doc(referrerUid).get();
                 if (referrerDoc.exists) {
@@ -637,9 +740,12 @@
                     
                     document.getElementById('referrer-username').textContent = 
                         referrerData.telegramData?.username ? '@' + referrerData.telegramData.username : '';
+                        
+                    console.log('Referrer data loaded:', referrerData.telegramData);
                 } else {
                     document.getElementById('referrer-name').textContent = 'একজন ইউজার';
                     document.getElementById('referrer-username').textContent = '';
+                    console.log('Referrer not found in database');
                 }
                 
                 referralInputSection.classList.add('hidden');
@@ -660,6 +766,8 @@
         // Show referral used section (PERMANENT - cannot be cleared)
         async function showReferralUsedSection(referrerUid) {
             try {
+                console.log('Loading referrer data for claimed bonus:', referrerUid);
+                
                 // Try to fetch referrer data from Firebase
                 const referrerDoc = await db.collection("users").doc(referrerUid).get();
                 if (referrerDoc.exists) {
@@ -762,7 +870,7 @@
                 });
             } else {
                 // Fallback - copy to clipboard
-                navigator.clipboard.writeText(shareText).then(() => {
+                navigator.clipboard.writeText(shareText + '\n' + referralLink).then(() => {
                     showAlert('রেফারেল লিংক কপি করা হয়েছে! টেলিগ্রামে পেস্ট করুন।');
                 });
             }
