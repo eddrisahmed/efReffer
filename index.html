@@ -114,15 +114,7 @@
 
     <!-- Main Referral Container -->
     <div id="referral-container" class="min-h-screen p-4 max-w-md mx-auto fade-in" style="display: none;">
-        <!-- Header -->
-        <header class="flex items-center justify-between p-4 sticky top-0 bg-opacity-80 backdrop-blur-md z-10 dark-bg">
-            <h1 class="text-xl font-bold text-[#ff8c00]">রেফারেল সিস্টেম</h1>
-            <button onclick="closeApp()" class="text-[#ff8c00] p-2 rounded-lg bg-gray-800">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </header>
-
-        <main class="space-y-6 mt-4">
+        <main class="space-y-6">
             <!-- Referral Code Section -->
             <div class="card-bg p-6 rounded-lg text-center">
                 <div class="flex items-center justify-center mb-2">
@@ -139,8 +131,8 @@
                 
                 <p class="text-sm text-gray-300 mb-4">
                     আপনার বন্ধুদের সাথে শেয়ার করুন এবং প্রতিটি সফল রেফারেলে 
-                    <span class="text-[#ff8c00] font-bold">100 ef</span> 
-                    বোনাস পান!
+                    <span class="text-[#ff8c00] font-bold" id="referral-bonus-amount">100</span> 
+                    ef বোনাস পান!
                 </p>
                 
                 <button id="share-btn" class="w-full p-3 rounded-lg btn-accent flex items-center justify-center">
@@ -189,7 +181,7 @@
                                 </button>
                                 <button onclick="claimReferralBonus()" class="flex-1 p-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm transition">
                                     <i data-lucide="sparkles" class="w-4 h-4 inline mr-1"></i>
-                                    ক্লেইম করুন
+                                    <span id="claim-bonus-amount">100</span> ef ক্লেইম করুন
                                 </button>
                             </div>
                         </div>
@@ -209,7 +201,7 @@
                                 <span id="referrer-info-username" class="text-green-200 ml-2"></span>
                             </p>
                             <p class="text-xs text-gray-300 mt-2 bg-green-900 bg-opacity-30 p-2 rounded">
-                                আপনি <span class="font-bold">100 ef</span> রেফারেল বোনাস পেয়েছেন
+                                আপনি <span class="font-bold" id="claimed-bonus-amount">100</span> ef রেফারেল বোনাস পেয়েছেন
                             </p>
                         </div>
                     </div>
@@ -233,6 +225,12 @@
                         <div class="text-2xl font-bold text-[#ff8c00]" id="referral-earnings">0</div>
                         <div class="text-sm text-gray-400 mt-1">রেফারেল আয়</div>
                     </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-gray-800 rounded-lg text-center">
+                    <p class="text-sm text-gray-300">
+                        প্রতি রেফারেলে আয়: <span class="text-[#ff8c00] font-bold" id="referrer-bonus-amount">100</span> ef
+                    </p>
                 </div>
             </div>
 
@@ -281,15 +279,16 @@
     </div>
 
     <script>
-        // Firebase Configuration - CORRECTED
+        // Firebase Configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyDBkvArKeIY11CDntlf9uyWPwZIPED1WZQ",
-            authDomain: "ef-earning-bot.firebaseapp.com", // Corrected
-            projectId: "ef-earning-bot",
-            storageBucket: "ef-earning-bot.appspot.com", // Corrected
-            messagingSenderId: "742449423671",
-            appId: "1:742449423671:web:7dfbef9db2e7b4ff6726b2"
-        };
+  apiKey: "AIzaSyAVsY970aU6sa6Cu2Yw0WnbS3OfCW7QfaY",
+  authDomain: "ef-earn-bot.firebaseapp.com",
+  databaseURL: "https://ef-earn-bot-default-rtdb.firebaseio.com",
+  projectId: "ef-earn-bot",
+  storageBucket: "ef-earn-bot.firebasestorage.app",
+  messagingSenderId: "700440287970",
+  appId: "1:700440287970:web:e602a158b0cc670d3f1cbb"
+};
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -310,6 +309,10 @@
         const referralInputSection = document.getElementById('referral-input-section');
         const referrerInfoSection = document.getElementById('referrer-info-section');
         const referralUsedSection = document.getElementById('referral-used-section');
+        const referralBonusAmountEl = document.getElementById('referral-bonus-amount');
+        const referrerBonusAmountEl = document.getElementById('referrer-bonus-amount');
+        const claimBonusAmountEl = document.getElementById('claim-bonus-amount');
+        const claimedBonusAmountEl = document.getElementById('claimed-bonus-amount');
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
@@ -351,6 +354,7 @@
                 // Update UI
                 updateReferralUI();
                 updateReferralStats();
+                updateBonusAmounts();
                 
                 // Show main content
                 referralContainer.style.display = 'block';
@@ -404,6 +408,7 @@
                 // Update UI
                 updateReferralUI();
                 updateReferralStats();
+                updateBonusAmounts();
                 
                 // Show main content
                 referralContainer.style.display = 'block';
@@ -531,15 +536,21 @@
             }
         }
 
-        // Load app configuration
+        // Load app configuration from Firebase
         async function loadAppConfig() {
             try {
                 const configDoc = await db.collection("config").doc("referral").get();
-                appConfig = configDoc.exists ? configDoc.data() : {
-                    referralBonus: 100,
-                    referrerBonus: 100,
-                    botUsername: "efEarnBot"
-                };
+                if (configDoc.exists) {
+                    appConfig = configDoc.data();
+                } else {
+                    // Create default config if not exists
+                    appConfig = {
+                        referralBonus: 100,
+                        referrerBonus: 100,
+                        botUsername: "efEarnBot"
+                    };
+                    await db.collection("config").doc("referral").set(appConfig);
+                }
             } catch (error) {
                 console.error('Error loading app config:', error);
                 appConfig = {
@@ -548,6 +559,17 @@
                     botUsername: "efEarnBot"
                 };
             }
+        }
+
+        // Update bonus amounts in UI
+        function updateBonusAmounts() {
+            const referralBonus = appConfig.referralBonus || 100;
+            const referrerBonus = appConfig.referrerBonus || 100;
+            
+            referralBonusAmountEl.textContent = referralBonus;
+            referrerBonusAmountEl.textContent = referrerBonus;
+            claimBonusAmountEl.textContent = referralBonus;
+            claimedBonusAmountEl.textContent = referralBonus;
         }
 
         // Setup event listeners
@@ -571,7 +593,7 @@
         function updateReferralUI() {
             if (!userData) return;
 
-            // Update referral code (using UID)
+            // Update referral code (using Telegram UID)
             referralCodeEl.textContent = userData.uid;
             
             // Show appropriate sections based on referral status
@@ -872,6 +894,7 @@
                 showAlert('বোনাস ক্লেইম করা হচ্ছে...');
                 
                 const bonusAmount = appConfig.referralBonus || 100;
+                const referrerBonusAmount = appConfig.referrerBonus || 100;
                 
                 // Try to update in Firebase
                 await db.collection("users").doc(userData.uid).update({
@@ -883,12 +906,13 @@
                 // Update referrer's data
                 await db.collection("referrals").doc(userData.referredBy).update({
                     totalReferrals: firebase.firestore.FieldValue.increment(1),
-                    totalEarnings: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100)
+                    totalEarnings: firebase.firestore.FieldValue.increment(referrerBonusAmount),
+                    referredUsers: firebase.firestore.FieldValue.arrayUnion(userData.uid)
                 });
                 
                 await db.collection("users").doc(userData.referredBy).update({
-                    balance: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100),
-                    totalEarned: firebase.firestore.FieldValue.increment(appConfig.referrerBonus || 100)
+                    balance: firebase.firestore.FieldValue.increment(referrerBonusAmount),
+                    totalEarned: firebase.firestore.FieldValue.increment(referrerBonusAmount)
                 });
                 
                 // Update local user data
@@ -916,19 +940,6 @@
                 updateReferralUI();
                 updateReferralStats();
                 showAlert(`🎉 অভিনন্দন! আপনি ${appConfig.referralBonus || 100} ef বোনাস পেয়েছেন (অফলাইন মোড)!`);
-            }
-        }
-
-        // Close app
-        function closeApp() {
-            if (tg && tg.close) {
-                tg.close();
-            } else {
-                showAlert('অ্যাপ বন্ধ করা হচ্ছে...');
-                // For browser testing
-                setTimeout(() => {
-                    window.history.back();
-                }, 1000);
             }
         }
 
